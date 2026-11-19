@@ -110,7 +110,8 @@ button:focus-visible,input:focus-visible{outline:4px solid var(--teal);outline-o
 .result.good{background:var(--ok)}.result.bad{background:var(--bad)}.result.none{background:var(--pine)}
 .result h2{font-size:40px}
 .result .gain{font-family:Fredoka;font-size:56px}
-.result p{font-size:19px}
+.result p{font-size:19px;max-width:30ch}
+.result .big{max-width:320px;background:#fbfff7;color:var(--forest);box-shadow:0 6px 0 rgba(0,0,0,.2)}
 
 /* ---------- remote / prompter ---------- */
 .remote{padding:14px 14px calc(14px + env(safe-area-inset-bottom));gap:12px;background:var(--forest);color:#eaf7e1}
@@ -382,14 +383,14 @@ function playerMode(){
 
 /* ================= REMOTE + PROMPTER (Julien's phone) ================= */
 const INTRO = [
-  { lab:"Slide 18 · Recap", cue:"After the Takeaway slide, take the floor.",
+  { lab:"Slide 18 · 1 day, 4 plot twists", cue:"After the Takeaway slide, take the floor.",
     say:"Thank you! So, let's sum up what we did today. We started with a very simple plan: four study blocks and two fun blocks. Easy, right? But then real life happened, four times: you got sick, a deadline appeared, your family came to visit, and there was a surprise test. And that is exactly what time management is about: not only making a plan, but dealing with what you didn't plan." },
-  { lab:"Slide 19 · 3 Rules", cue:"Point at each card as you say it.",
-    say:"From this game, we can keep three simple rules. One: leave space. The players who left some boxes empty didn't have to erase anything when the surprises came. Two: prioritize. When there is no room left, keep the most important task and drop the rest. Erasing a block cost you one point, but keeping the deadline gave you three. Three: adapt. A plan is not a contract. When life changes, you rearrange it, you don't give up." },
-  { lab:"Slide 20 · In real life", cue:"Slow down here, it's the theory.",
-    say:"In real life, this is called the Eisenhower Matrix. Tasks that are urgent and important, like the deadline in the game, you do first. Tasks that are important but not urgent, like studying for an exam in three weeks, you schedule early, so they don't become urgent. And rest and fun are not a waste of time: in the game, a break after studying gave you points. In real life, they keep you productive." },
-  { lab:"Slide 21 · Quick Quiz", cue:"Switch the PC to the quiz tab (QR code on screen). Then say:",
-    say:"Now it's your turn! Let's see what you remember. Take your phone, scan the QR code on the screen, and type a nickname. Five questions, and the faster you answer, the more points you get." }
+  { lab:"Slide 19 · 3 rules to keep", cue:"Point at each yellow block as you say it.",
+    say:"From this game, we can keep three simple rules. One: leave space. The players who left some boxes empty didn't have to erase anything when the surprises came. Two: prioritize. When there is no room left, keep what matters and drop the rest. Erasing a block cost you one point, but keeping the deadline gave you three. Three: adapt. A plan is a tool, not a contract. When life changes, you rearrange it, you don't give up." },
+  { lab:"Slide 20 · Eisenhower Matrix", cue:"Slow down here, point at each square.",
+    say:"In real life, this is called the Eisenhower Matrix. Urgent and important, like the deadline in the game: you do it first. Important but not urgent, like studying or resting: you schedule it, before it becomes urgent. Urgent but not important, like notifications: you limit it. And not urgent, not important, like endless scrolling: you drop it. And yes, rest is important too: in the game, a break after studying gave you points." },
+  { lab:"Slide 21 · Plot twist #5", cue:"CLICK the title or the bottom box on the slide: it opens the live quiz screen. Then say:",
+    say:"Surprise! Here is plot twist number five: a quiz! Take your phone, scan the QR code on the screen and type a nickname. Five questions, and the faster you answer, the more points you get." }
 ];
 function remoteMode(){
   root.className = "app remote";
@@ -440,8 +441,45 @@ function remoteMode(){
   setInterval(() => { if (S.phase === "question") { render(); autoReveal(); } }, 500);
 }
 
+
+/* ================= DEMO (solo practice, nothing sent) ================= */
+function demoMode(){
+  root.className = "app player";
+  let i = 0, score = 0, t0 = 0, timer = null, done = false;
+  const top = () => `<div class="ptop"><span><b>Practice round</b></span><span>${score} pts</span></div>`;
+  function intro(){
+    root.innerHTML = top() + `<div class="card join"><h1>Try the quiz</h1><p>Play the 5 questions on your own. Nothing is sent to the big screen.</p><button class="big" id="st">Start</button></div>`;
+    document.getElementById("st").onclick = () => { i = 0; score = 0; ask(); };
+  }
+  function ask(){
+    const Q = QUESTIONS[i]; t0 = Date.now(); done = false;
+    root.innerHTML = top() + `<div class="card"><div class="ptimer" id="pt">Question ${i+1}</div><div class="pq"></div></div>
+    <div class="btns">${Q.a.map((a,k)=>`<button class="ans c${k}"><span class="ic">${ICONS[k]}</span><span class="t"></span></button>`).join("")}</div>`;
+    root.querySelector(".pq").textContent = Q.q;
+    root.querySelectorAll(".ans").forEach((b,k) => { b.querySelector(".t").textContent = Q.a[k]; b.onclick = () => show(k); });
+    clearInterval(timer);
+    timer = setInterval(() => { const r = DUR - (Date.now()-t0)/1000; const el = document.getElementById("pt");
+      if (el) el.textContent = "Question " + (i+1) + " · " + Math.max(0, Math.ceil(r)) + "s"; if (r <= 0) show(null); }, 250);
+  }
+  function show(k){
+    if (done) return; done = true; clearInterval(timer);
+    const Q = QUESTIONS[i], ok = k === Q.c, el = Math.min(1, (Date.now()-t0)/(DUR*1000));
+    const g = ok ? Math.round(1000 - 500*el) : 0; score += g;
+    const cls = k === null ? "none" : ok ? "good" : "bad";
+    root.innerHTML = top() + `<div class="result ${cls}"><h2>${k === null ? "Too late!" : ok ? "Correct!" : "Not this time"}</h2><div class="gain">+${g}</div><p id="ex"></p><button class="big" id="nx">${i < QUESTIONS.length-1 ? "Next question" : "See my score"}</button></div>`;
+    document.getElementById("ex").textContent = ok ? Q.say : "Answer: " + ICONS[Q.c] + " " + Q.a[Q.c];
+    document.getElementById("nx").onclick = () => { i++; if (i < QUESTIONS.length) ask(); else end(); };
+  }
+  function end(){
+    root.innerHTML = top() + `<div class="wait"><div class="em">🏁</div><h2>${score} points</h2><p>That's how the real quiz works. On the day, everyone plays at the same time.</p><button class="big" id="again">Play again</button></div>`;
+    document.getElementById("again").onclick = () => { i = 0; score = 0; ask(); };
+  }
+  intro();
+}
+
 /* ================= router ================= */
-if (params.has("screen")) screenMode();
+if (params.has("demo")) demoMode();
+else if (params.has("screen")) screenMode();
 else if (params.get("remote") === REMOTE_KEY) remoteMode();
 else playerMode();
 </script>
